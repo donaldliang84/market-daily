@@ -26,10 +26,10 @@ def _is_list_page(title, url, snippet):
     import re
 
     # URL patterns that indicate list/roll pages
+    # Be conservative: many real articles have URLs ending in digits!
     list_url_patterns = [
-        r"/roll/", r"/list/", r"/news/?(index|list)?$", r"/\d+/$",
+        r"/roll/", r"/list/", r"/news/?$", r"/kuaixun/?$", r"/live/?$",
         r"stock\.", r"quote", r"realstock",
-        r"news\.?roll", r"kuaixun", r"live",
         r"search\?", r"tag/", r"topic/",
     ]
     for pat in list_url_patterns:
@@ -106,11 +106,28 @@ def search_news(direction, max_results=15):
     from ddgs import DDGS
 
     results = []
-    queries = [
-        f"{direction} 新闻",
-        f"{direction} A股 最新",
-        f"{direction} 政策 动态",
-    ]
+
+    # Build search queries based on direction name
+    # Handle special cases like "国家政策/宏观经济"
+    if "/" in direction:
+        parts = [p.strip() for p in direction.split("/")]
+        queries = [
+            f"{parts[0]} {parts[1]} 新闻",
+            f"{parts[0]} 最新",
+            f"{parts[1]} 最新",
+        ]
+    elif direction == "AI":
+        queries = [
+            "AI 人工智能 新闻",
+            "AI 行业 最新",
+            "人工智能 政策 动态",
+        ]
+    else:
+        queries = [
+            f"{direction} 行业 新闻",
+            f"{direction} 最新 动态",
+            f"{direction} 政策 新闻",
+        ]
 
     try:
         with DDGS() as ddgs:
@@ -120,7 +137,7 @@ def search_news(direction, max_results=15):
                     query,
                     region="cn-zh",
                     timelimit="d",
-                    max_results=8,
+                    max_results=10,
                 ):
                     url = r.get("href", "") or r.get("link", "")
                     if not url or url in seen:

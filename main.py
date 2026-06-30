@@ -124,7 +124,8 @@ def main():
             content = item.get("content", "")
 
             # List-page patterns that are hard to catch from URL alone
-            list_page_titles = ["滚动", "快讯", "速递", "要闻", "早报", "晚报", "热榜", "汇总", "行情"]
+            # "要闻" is too common in real article titles, skip it here
+            list_page_titles = ["滚动", "快讯(播)", "速递", "早报", "晚报", "热榜", "汇总", "行情"]
             is_list = any(kw in title for kw in list_page_titles)
 
             # If title has obvious list markers and content is short → list page

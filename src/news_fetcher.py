@@ -21,6 +21,83 @@ HEADERS = {
 }
 
 
+def _is_list_page(title, url, snippet):
+    """Detect and filter out list/aggregation pages instead of specific news articles."""
+    import re
+
+    # URL patterns that indicate list/roll pages
+    list_url_patterns = [
+        r"/roll/", r"/list/", r"/news/?(index|list)?$", r"/\d+/$",
+        r"stock\.", r"quote", r"realstock",
+        r"news\.?roll", r"kuaixun", r"live",
+        r"search\?", r"tag/", r"topic/",
+    ]
+    for pat in list_url_patterns:
+        if re.search(pat, url, re.I):
+            return True
+
+    # Title/snippet keywords indicating list/aggregation/stock pages
+    list_title_kw = [
+        "滚动", "快讯", "速递", "行情", "大盘", "早报", "晚报",
+        "实时", "涨幅榜", "跌幅榜", "资金流向",
+        "今日要闻", "今日热榜", "最新动态", "新闻汇总",
+        "涨停", "跌停", "个股", "板块",
+    ]
+    text = title + snippet
+    for kw in list_title_kw:
+        if kw in text:
+            return True
+
+    # Individual stock mentions (e.g. "XX股份大涨", "XX涨停")
+    stock_pattern = re.compile(r'[^\s，。、,]{2,6}(股份|集团|科技|医药|电子|能源|涨停|跌停|大涨|暴跌)')
+    matches = stock_pattern.findall(title)
+    # If it's a specific stock name followed by action, likely individual stock news
+    if len(matches) >= 2:
+        return True
+
+    return False
+
+
+def _deduplicate_and_filter(results, max_results=15):
+    """Deduplicate, remove list pages, sort by quality."""
+    seen_urls = set()
+    seen_titles = set()
+    filtered = []
+
+    for r in results:
+        url = r["url"]
+        title = r["title"].strip()
+        snippet = r.get("snippet", "")
+
+        # URL de-dup
+        url_key = url.split("?")[0].rstrip("/")[:80]
+        if url_key in seen_urls:
+            continue
+        seen_urls.add(url_key)
+
+        # Title de-dup
+        title_key = title[:40]
+        if title_key in seen_titles or len(title) < 10:
+            continue
+        seen_titles.add(title_key)
+
+        # Filter out list pages and stock quotes
+        if _is_list_page(title, url, snippet):
+            continue
+
+        filtered.append(r)
+
+    # Sort: prefer known financial sites
+    def _sort_key(r):
+        for i, site in enumerate(FINANCE_SITES):
+            if site in r["url"]:
+                return (0, i)
+        return (1, 0)
+
+    filtered.sort(key=_sort_key)
+    return filtered[:max_results]
+
+
 def search_news(direction, max_results=15):
     """Search for recent Chinese financial news about a direction using DuckDuckGo.
 
@@ -30,9 +107,9 @@ def search_news(direction, max_results=15):
 
     results = []
     queries = [
-        f"{direction} 股市 新闻",
+        f"{direction} 新闻",
         f"{direction} A股 最新",
-        f"{direction} 政策 最新动态",
+        f"{direction} 政策 动态",
     ]
 
     try:
@@ -58,25 +135,7 @@ def search_news(direction, max_results=15):
     except Exception as e:
         logger.warning("DuckDuckGo search failed for '%s': %s", direction, e)
 
-    # Deduplicate by normalized title + url
-    seen_titles = set()
-    deduped = []
-    for r in results:
-        key = (r["title"].strip()[:40], r["url"].strip()[:60])
-        if key in seen_titles:
-            continue
-        seen_titles.add(key)
-        deduped.append(r)
-
-    # Sort: prefer known financial sites, then by result order
-    def _sort_key(r):
-        for i, site in enumerate(FINANCE_SITES):
-            if site in r["url"]:
-                return (0, i)
-        return (1, 0)
-
-    deduped.sort(key=_sort_key)
-    return deduped[:max_results]
+    return _deduplicate_and_filter(results, max_results)
 
 
 def fetch_article(url, timeout=10):

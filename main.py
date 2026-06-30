@@ -109,13 +109,37 @@ def main():
 
         # Fetch content & analyze
         analyzed = []
-        for item in items[:8]:  # Fetch top 8 for content
+        for item in items[:10]:  # Fetch top 10 for content (buffer for post-fetch filtering)
             try:
                 content = fetch_article(item["url"])
                 item["content"] = content
             except Exception as e:
                 logger.debug("  fetch failed: %s", e)
                 item["content"] = ""
+
+            # Post-fetch quality filter: if we got content but it's very short,
+            # or the title is a generic list-page pattern, skip it
+            title = item.get("title", "")
+            snippet = item.get("snippet", "")
+            content = item.get("content", "")
+
+            # List-page patterns that are hard to catch from URL alone
+            list_page_titles = ["滚动", "快讯", "速递", "要闻", "早报", "晚报", "热榜", "汇总", "行情"]
+            is_list = any(kw in title for kw in list_page_titles)
+
+            # If title has obvious list markers and content is short → list page
+            if is_list and len(content.strip()) < 500:
+                logger.debug("  filtered: list page (title=%s)", title[:30])
+                continue
+
+            # If content is extremely short for what should be a real article
+            if len(content.strip()) < 200 and len(snippet) < 100:
+                # Could be a stock quote page or thin aggregator
+                import re
+                stock_pattern = re.compile(r'[^\s，。、,]{2,6}(股份|集团|科技|涨停|跌停)')
+                if stock_pattern.search(title):
+                    logger.debug("  filtered: stock quote page (title=%s)", title[:30])
+                    continue
 
             # Analyze
             try:
@@ -130,6 +154,11 @@ def main():
                 item["analysis"] = {}
 
             analyzed.append(item)
+
+        if not analyzed:
+            logger.info("  所有新闻均被过滤，跳过该方向")
+            direction_groups.append({"direction": direction, "news": []})
+            continue
 
         # Sort: major first, then by impact (positive > neutral > negative)
         analyzed.sort(key=lambda x: (

@@ -21,7 +21,7 @@ _IMPORTANCE_LABELS = {
 }
 
 
-def generate_html_report(direction_groups, date_str=None):
+def generate_html_report(direction_groups, date_str=None, edition_label="午间"):
     """Generate a styled HTML report string."""
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -74,7 +74,7 @@ def generate_html_report(direction_groups, date_str=None):
 <div style="max-width:680px;margin:0 auto;padding:20px;">
   <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:12px;padding:28px 20px;margin-bottom:24px;text-align:center;">
     <h1 style="color:#fff;margin:0;font-size:22px;">📊 每日市场新闻日报</h1>
-    <p style="color:rgba(255,255,255,.65);margin:6px 0 0;font-size:13px;">{date_str} · 自动生成</p>
+    <p style="color:rgba(255,255,255,.65);margin:6px 0 0;font-size:13px;">{date_str} · {edition_label}</p>
   </div>
   {''.join(sections)}
   <div style="text-align:center;padding:16px 0;color:#aaa;font-size:12px;border-top:1px solid #eee;margin-top:8px;">
@@ -85,13 +85,13 @@ def generate_html_report(direction_groups, date_str=None):
 </body></html>"""
 
 
-def send_email(smtp_config, html_content, date_str=None):
+def send_email(smtp_config, html_content, date_str=None, edition="午间"):
     """Send HTML email via SMTP. Returns True on success."""
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = Header(f"每日市场新闻日报 - {date_str}", "utf-8")
+    msg["Subject"] = Header(f"每日市场新闻日报 ({edition}) - {date_str}", "utf-8")
     msg["From"] = smtp_config["user"]
     msg["To"] = smtp_config.get("to_addr", smtp_config["user"])
 

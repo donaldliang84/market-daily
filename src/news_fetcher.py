@@ -132,16 +132,18 @@ def _deduplicate_and_filter(results, max_results=15):
     return filtered[:max_results]
 
 
-def search_news(direction, max_results=15):
+def search_news(direction, max_results=15, edition="noon"):
     """Search for recent Chinese financial news about a direction using DuckDuckGo.
 
+    edition: "noon" = 12:00 edition (24h window), "evening" = 21:00 edition (9h window).
     Returns list of dicts: [{title, url, snippet, source}]
     """
     from ddgs import DDGS
 
     results = []
 
-    # Build search queries based on direction name
+    # Build search queries based on direction name and edition
+    # Evening edition uses shorter time window queries
     # Handle special cases like "国家政策/宏观经济"
     if "/" in direction:
         parts = [p.strip() for p in direction.split("/")]

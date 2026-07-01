@@ -70,10 +70,23 @@ def get_llm_config():
 
 
 # ---------------------------------------------------------------------------
+# Run detection: determine "noon" (12:00) vs "evening" (21:00) edition
+# ---------------------------------------------------------------------------
+def detect_edition():
+    """Return ('noon'|'evening', label_string) based on current UTC hour."""
+    utc_hour = datetime.utcnow().hour
+    # UTC 04:00 = BJ 12:00, UTC 13:00 = BJ 21:00
+    if utc_hour <= 8:
+        return "noon", "午间"
+    return "evening", "晚间"
+
+
+# ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
 def main():
-    logger.info("=== 每日市场新闻日报 开始 ===")
+    edition, edition_label = detect_edition()
+    logger.info("=== 每日市场新闻日报 (%s) 开始 ===", edition_label)
 
     # 1. Dirs
     directions = load_directions()
@@ -101,10 +114,10 @@ def main():
     total = 0
 
     for direction in directions:
-        logger.info("--- 处理: %s ---", direction)
+        logger.info("--- 处理: %s [%s] ---", direction, edition_label)
 
-        # Search
-        items = search_news(direction, max_results=15)
+        # Search — shorter time window for evening edition (only afternoon news)
+        items = search_news(direction, max_results=15, edition=edition)
         logger.info("  搜索到 %d 条", len(items))
 
         # Fetch content & analyze
@@ -178,11 +191,11 @@ def main():
 
     # 5. Generate report
     date_str = datetime.now().strftime("%Y-%m-%d")
-    html = generate_html_report(direction_groups, date_str)
+    html = generate_html_report(direction_groups, date_str, edition_label)
 
     # 6. Send
     logger.info("发送邮件至 %s...", smtp["to_addr"])
-    ok = send_email(smtp, html, date_str)
+    ok = send_email(smtp, html, date_str, edition_label)
 
     if ok:
         logger.info("=== 完成! 共 %d 条新闻 ===", total)

@@ -162,6 +162,11 @@ def main():
                 logger.warning("  analysis error: %s", e)
                 analysis = None
 
+            # Reject: if LLM says it's unimportant + neutral, skip it
+            if analysis and analysis.get("reject"):
+                logger.debug("  rejected: unimportant + neutral (title=%s)", item.get("title", "")[:30])
+                continue
+
             if analysis:
                 item["analysis"] = analysis
             else:
@@ -180,14 +185,19 @@ def main():
             -["positive", "neutral", "negative"].index(x.get("analysis", {}).get("impact", "neutral")),
         ))
 
-        # Cap at 5
-        top5 = analyzed[:5]
+        # Per-direction cap based on remaining global budget
+        remaining = max(0, 30 - total)
+        dirs_done = len(direction_groups)  # directions already processed
+        remaining_dirs = max(1, len(directions) - dirs_done)
+        per_dir_cap = min(5, max(1, (remaining + remaining_dirs - 1) // remaining_dirs) if remaining > 0 else 0)
+
+        top_n = analyzed[:per_dir_cap]
         direction_groups.append({
             "direction": direction,
-            "news": top5,
+            "news": top_n,
         })
-        total += len(top5)
-        logger.info("  保留 %d 条", len(top5))
+        total += len(top_n)
+        logger.info("  保留 %d 条 (全局已用 %d/30)", len(top_n), total)
 
     # 5. Generate report
     date_str = datetime.now().strftime("%Y-%m-%d")

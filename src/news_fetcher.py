@@ -36,22 +36,53 @@ def _is_list_page(title, url, snippet):
         if re.search(pat, url, re.I):
             return True
 
-    # Title/snippet keywords indicating list/aggregation/stock pages
+    # Title/snippet keywords indicating list/aggregation pages
     list_title_kw = [
         "滚动", "快讯", "速递", "行情", "大盘", "早报", "晚报",
         "实时", "涨幅榜", "跌幅榜", "资金流向",
         "今日要闻", "今日热榜", "最新动态", "新闻汇总",
-        "涨停", "跌停", "个股", "板块",
     ]
     text = title + snippet
     for kw in list_title_kw:
         if kw in text:
             return True
 
-    # Individual stock mentions (e.g. "XX股份大涨", "XX涨停")
-    stock_pattern = re.compile(r'[^\s，。、,]{2,6}(股份|集团|科技|医药|电子|能源|涨停|跌停|大涨|暴跌)')
-    matches = stock_pattern.findall(title)
-    # If it's a specific stock name followed by action, likely individual stock news
+    return False
+
+
+def _is_stock_fund_price_news(title, url, snippet):
+    """Detect individual stock/fund price news that has no industry-level value."""
+    import re
+
+    text = title + snippet
+
+    # Individual stock/fund price movement patterns
+    price_patterns = [
+        # "XX涨超X%", "XX下跌X%", "XX大跌X%"
+        r'[^\s，。、,]{2,6}(?:涨超|跌超|下跌|上涨|大涨|暴跌|涨幅|跌幅)\s*[\d.]+\s*[%％]',
+        # "XX涨停/跌停" in title (not just snippet)
+        r'[^\s，。、,]{2,4}(?:涨停|跌停)',
+        # "XX股价" mentions
+        r'[^\s，。、,]{2,6}(?:股价|市值)\s*(?:涨|跌|超|达|报)',
+        # Stock/fund code patterns: 6 digits (SH/SZ), or ETF/LOF mentions
+        r'(?:收盘价|报收)\s*[\d.]+\s*元',
+        # "XX概念股大涨/下跌"
+        r'[^\s，。、,]{2,8}(?:概念股|板块)\s*(?:大涨|暴跌|走强|走弱|活跃|回调)',
+        # Fund-specific: "XX基金净值", "ETF", "LOF"
+        r'[^\s，。、,]{2,6}(?:基金|ETF)\s*(?:净值|份额|规模)',
+    ]
+
+    for pat in price_patterns:
+        if re.search(pat, text):
+            return True
+
+    # Specific stock name + price action (e.g. "寒武纪大涨", "中芯国际下跌")
+    # But NOT when combined with industry context words
+    stock_action = re.compile(
+        r'[^\s，。、,]{2,6}(?:股份|集团|科技|医药|电子|能源|智能|生物|材料)'
+        r'.{0,8}(?:大涨|暴跌|涨超|跌超|涨停|跌停|上涨|下跌|反弹|回调)'
+    )
+    matches = stock_action.findall(text)
     if len(matches) >= 2:
         return True
 
@@ -83,6 +114,9 @@ def _deduplicate_and_filter(results, max_results=15):
 
         # Filter out list pages and stock quotes
         if _is_list_page(title, url, snippet):
+            continue
+        if _is_stock_fund_price_news(title, url, snippet):
+            logger.debug("  filtered: stock/fund price news (title=%s)", title[:30])
             continue
 
         filtered.append(r)

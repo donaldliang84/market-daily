@@ -144,7 +144,7 @@ def search_news(direction, max_results=15, edition="noon"):
 
     # Build search queries based on direction name and edition
     # Evening edition uses shorter time window queries
-    # Handle special cases like "国家政策/宏观经济"
+    # Handle special cases
     if "/" in direction:
         parts = [p.strip() for p in direction.split("/")]
         queries = [
@@ -152,11 +152,35 @@ def search_news(direction, max_results=15, edition="noon"):
             f"{parts[0]} 最新",
             f"{parts[1]} 最新",
         ]
-    elif direction == "AI":
+    elif direction == "AI算力":
         queries = [
-            "AI 人工智能 新闻",
-            "AI 行业 最新",
-            "人工智能 政策 动态",
+            "AI算力 芯片 新闻",
+            "AI算力 服务器 需求",
+            "算力 基础设施 建设",
+        ]
+    elif direction == "国产半导体设备":
+        queries = [
+            "国产半导体设备 突破 新闻",
+            "半导体 设备 国产化 替代",
+            "光刻机 刻蚀 国产 进展",
+        ]
+    elif direction == "存储":
+        queries = [
+            "存储芯片 行业 新闻",
+            "内存 闪存 市场 动态",
+            "存储 半导体 需求",
+        ]
+    elif direction == "人形机器人":
+        queries = [
+            "人形机器人 进展 新闻",
+            "人形机器人 产业链",
+            "机器人 量产 产业化",
+        ]
+    elif direction == "商业航天":
+        queries = [
+            "商业航天 新闻",
+            "商业航天 发射 卫星",
+            "商业航天 政策 动态",
         ]
     else:
         queries = [
